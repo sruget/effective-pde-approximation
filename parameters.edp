@@ -1,0 +1,22 @@
+// =======================
+// Shared parameters
+// =======================
+
+// Mesh parameters
+real eps = 0.1;               // scale parameter
+real r   = 27.;                 // ratio eps/h
+real h = eps/r;                 // fine mesh parameter
+real H = 0.05;                  // coarse mesh parameter
+real Lx = 1.;                   // domain length x-axis
+real Ly = 1.;                   // domain length y-axis
+
+// Data parameters
+int nbSecondMember = 3;         // nbr of loadings
+int nbMonteCarlo = 40;          // nbr to estimate empirical mean  
+int nbMonteCarlo2 = 40;         // nbr to compute confidence interval at 95%
+
+// Optimization parameters
+int Niter = 400;                  // nbr of iterations
+real rho = 0.1;                   // fixed step size
+real[int] Ainit = [16., 0., 4.];  // initial coefficient
+real m1 = 0.1;                    // Armijo parameter

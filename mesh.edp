@@ -1,0 +1,16 @@
+// =======================
+// Mesh and Microstructure
+// =======================
+
+func mesh buildMesh(real Lx, real Ly, int n)
+{
+    // Rectangular domain [0,Lx]x[0,Ly]
+    border bottom(t=0, Lx) {x=t; y=0; label=1;}
+    border right(t=0, Ly) {x=Lx; y=t; label=2;}
+    border top(t=Lx ,0) {x=t; y=Ly; label=3;}
+    border left(t=Ly, 0) {x=0; y=t; label=4;}
+
+    mesh Th = buildmesh(bottom(n) + right(n) + top(n) + left(n));
+
+    return Th;
+}

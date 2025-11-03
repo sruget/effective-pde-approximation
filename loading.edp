@@ -1,0 +1,55 @@
+// =======================
+// Boundary Conditions
+// =======================
+
+// cosinus
+func real[int, int] coscosLoading(mesh &Th, int nbSecondMember)
+{
+	real[int] nx = [1, 2, 1, 2, 3, 1, 3, 2, 4, 1, 4, 2, 5, 1, 5, 2]; // remove couple (nx, ny) \in ((3, 3), (4, 3), (3, 4)) cause they are already spanned by the other g
+	real[int] ny = [1, 1, 2, 2, 1, 3, 2, 3, 1, 4, 2, 4, 1, 5, 2, 5];
+
+    fespace Vh(Th, P1);
+	Vh getsizeofarray;
+	Vh[int] RHS(nbSecondMember);
+	real[int, int] RHStable(nbSecondMember, getsizeofarray[].n);
+
+	for (int p = 0; p < nbSecondMember; p++){
+		RHS[p] = cos(nx[p]*pi*x)*cos(ny[p]*pi*y);
+
+		// Normalization
+		for (int q = 0; q < p; q++){
+			real coef = int1d(Th, 1)(RHS[p]*RHS[q]) + int1d(Th, 2)(RHS[p]*RHS[q]) + int1d(Th, 3)(RHS[p]*RHS[q]) + int1d(Th, 4)(RHS[p]*RHS[q]);
+			RHS[p][] -= coef*RHS[q][];
+		}
+		real rescalefactor = sqrt(int1d(Th, 1)(RHS[p]*RHS[p]) + int1d(Th, 2)(RHS[p]*RHS[p]) + int1d(Th, 3)(RHS[p]*RHS[p]) + int1d(Th, 4)(RHS[p]*RHS[p]));
+		RHS[p] = RHS[p] / rescalefactor;
+		RHStable(p, :) = RHS[p][];
+	}
+
+	return RHStable;
+}
+
+// =======================
+// Boundary Conditions
+// =======================
+// sinus
+func real[int, int] sinsinLoading(mesh &Th, int nbSecondMember)
+{
+	real[int] nx = [1, 2, 1, 2, 3, 1, 3, 2, 4, 1, 3, 4, 2, 4, 3, 5, 1, 5, 2];
+	real[int] ny = [1, 1, 2, 2, 1, 3, 2, 3, 1, 4, 3, 2, 4, 3, 4, 1, 5, 2, 5];
+
+    fespace Vh(Th, P1);
+	Vh getsizeofarray;
+	Vh[int] RHS(nbSecondMember);
+	real[int, int] RHStable(nbSecondMember, getsizeofarray[].n);
+
+	for (int p = 0; p < nbSecondMember; p++){
+		RHS[p] = sin(nx[p]*pi*x)*sin(ny[p]*pi*y);
+
+		real rescalefactor = sqrt(int2d(Th)(RHS[p]*RHS[p]));
+		RHS[p] = RHS[p] / rescalefactor;
+		RHStable(p, :) = RHS[p][];
+	}
+	
+	return RHStable;
+}

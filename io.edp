@@ -1,0 +1,19 @@
+// =======================
+// IO Utilities
+// =======================
+
+func int saveSolution(real[int] u, string filename)
+{
+    ofstream fout(filename);
+    fout << u;
+    fout.flush;
+    return 0;
+}
+
+
+func int loadSolution(real[int] &u, string filename)
+{
+    ifstream fin(filename);
+    fin >> u;
+    return 0;
+}
