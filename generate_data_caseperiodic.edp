@@ -1,0 +1,33 @@
+include "../src/parameters.edp"
+include "../src/mesh.edp"
+include "../src/loading.edp"
+include "../src/solver.edp"
+include "../src/io.edp"
+
+// Build Mesh
+mesh Th = buildMesh(Lx, Ly, floor(1./H));
+fespace Vh(Th, P1); 
+Vh ueps;
+
+// Bilinear form
+func Aeps11func = 22 + 10*(sin(2*pi*x/eps) + sin(2*pi*y/eps));
+func Aeps12func = 0.*x;
+func Aeps22func = 12 + 2*(sin(2*pi*x/eps) + sin(2*pi*y/eps));
+Vh A11 = Aeps11func(x,y);
+Vh A12 = Aeps12func(x,y);
+Vh A22 = Aeps22func(x,y);
+
+matrix A = stiffnessMatrix(Th, A11[], A12[], A22[]);
+set(A,solver=sparsesolver);
+
+// Linear forms
+real[int, int] loadings = coscosLoading(Th, nbSecondMember);
+
+// Compute solutions
+for (int p = 0; p<nbSecondMember; p++){
+    real[int] Bp = linearForm(Th, loadings(p,:));
+    real[int] sol = A^-1*Bp; 
+	ueps[] = sol(0:sol.n-1);
+    string filename = "./Solution/caseperiodic/coscosloading/SolutionOscillating_p"+p+"_eps"+eps+"_h"+h+".txt";
+    saveSolution(ueps[], filename);
+}

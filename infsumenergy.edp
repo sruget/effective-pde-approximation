@@ -1,0 +1,152 @@
+//include "../loading.edp"
+//include "../solver_neumann.edp"
+
+
+func real[int] lineSearchArmijo(
+            real[int, int] loadings,
+			int nbSecondMember, 
+            real[int] AbarL, 
+            real[int] dir, 
+            real costfunc, 
+            real[int] energyOscillating, 
+            real bound,
+            mesh &TH,
+            real rescalefactor)
+{
+	fespace VH(TH, P1);
+	int n = VH.ndof;
+	VH urho;
+
+	int NLineSearch = 0;
+	real rho=1.;
+	real[int] Arho(3);
+	real J, linesearch;
+    real[int] one(n);
+    one = 1.;  
+	real[int] A11(n), A12(n), A22(n);
+
+	while (NLineSearch < 7){	
+		Arho = AbarL(:) - rho*dir;
+		
+		real costfuncrho = 0.;
+		A11 = Arho(0)*one;
+		A12 = Arho(1)*one;
+		A22 = Arho(2)*one;
+		
+		matrix Aarho = stiffnessMatrix(TH, 
+									A11, 
+									A12, 
+									A22);
+		set(Aarho,solver=sparsesolver);
+		
+		for (int p = 0; p < nbSecondMember; p++){
+            real[int] Bp = linearForm(TH, loadings(p,:));
+            real[int] sol = Aarho^-1*Bp; 
+			urho[] = sol(0:sol.n-2);
+
+			J = energyOscillating(p) - int2d(TH)(dx(urho) * (Arho[0]*dx(urho) + Arho[1]*dy(urho)) 
+                                               + dy(urho) * (Arho[1]*dx(urho) + Arho[2]*dy(urho)));
+			costfuncrho += rescalefactor*J*J;
+		}
+		linesearch = (costfuncrho-costfunc)/rho;
+
+		if(linesearch <= bound){return Arho;}
+		else {rho /= 2.;}
+		
+		NLineSearch += 1;
+	}
+
+	return Arho;
+}
+
+
+
+
+
+
+func real infSumEnergy(
+            real[int] Ainit,
+	        real[int] energyOscillating,
+            real[int, int] loadings,
+            int linesearch,
+            real nbSecondMember,
+            real Niter,
+            real rho,
+			real m1,
+		    mesh &TH)
+{    
+  	// Mesh
+	fespace VH(TH,P1);
+	int n = VH.ndof;
+
+    // Loadings
+	VH[int] RHS(nbSecondMember);
+
+
+////////////////////////////
+//        Iteration       //
+////////////////////////////
+	real[int, int] listA(Niter, 3);
+	listA(0, :) = Ainit;
+
+	real[int] energyMacro(nbSecondMember);
+    real[int] derJ2(3);	
+	VH[int] SolBar(nbSecondMember);
+	VH ubar, phi, fH;
+    matrix Abark;
+    real costfunction;
+    real[int] ones(n);
+    ones = 1.;  
+	real[int] A11(n), A12(n), A22(n);
+	
+	
+	real bound, scale;
+	real rescalefactor = 10^5;
+
+	for (int k = 0; k < Niter-1; k++){
+		// Compute coarse energy
+		A11 = listA(k, 0)*ones;
+		A12 = listA(k, 1)*ones;
+		A22 = listA(k, 2)*ones;
+        Abark = stiffnessMatrix(TH, 
+                            A11, 
+                            A12, 
+                            A22);
+		set(Abark,solver=sparsesolver);
+
+		for (int p = 0; p < nbSecondMember; p++){
+            real[int] Bp = linearForm(TH, loadings(p,:));
+            real[int] sol = Abark^-1*Bp; 
+	        SolBar[p][] = sol(0:sol.n-2);
+            ubar = SolBar[p];
+		    energyMacro(p) = int2d(TH)(dx(ubar) * (listA(k, 0)*dx(ubar) + listA(k, 1)*dy(ubar)) 
+		    	            		 + dy(ubar) * (listA(k, 1)*dx(ubar) + listA(k, 2)*dy(ubar)));
+		}
+
+		// Direction of descent
+		derJ2 = [0.,0.,0.];
+		
+		costfunction = 0.; 
+		for (int p = 0; p < nbSecondMember; p++){			
+			ubar = SolBar[p];
+			real J = (energyOscillating(p) - energyMacro(p));
+			costfunction += rescalefactor*J*J;
+			derJ2[0] += 2 * J * int2d(TH)(dx(ubar) * dx(ubar)) * rescalefactor;
+			derJ2[1] += 4 * J * int2d(TH)(dx(ubar) * dy(ubar)) * rescalefactor;
+			derJ2[2] += 2 * J * int2d(TH)(dy(ubar) * dy(ubar)) * rescalefactor;
+		}
+		scale = max(abs(derJ2(0)), abs(derJ2(1)), abs(derJ2(2)));
+		derJ2 /= scale;
+
+        // New iterate
+        if (linesearch == 0){
+		    listA(k+1, :) = listA(k, :) - rho*derJ2;
+        }
+        else{
+		    bound = m1*(-1)*(derJ2[0]*derJ2[0] + derJ2[1]*derJ2[1] + derJ2[2]*derJ2[2])*scale;
+		    listA(k+1, :) = lineSearchArmijo(loadings, nbSecondMember, listA(k, :), derJ2, costfunction, energyOscillating, bound, TH, rescalefactor);
+        }
+	}
+	
+	return listA(Niter-1, :);
+};

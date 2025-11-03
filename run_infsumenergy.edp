@@ -1,0 +1,48 @@
+include "../src/parameters.edp"
+include "../src/mesh.edp"
+include "../src/loading.edp"
+include "../src/solver.edp"
+include "../src/io.edp"
+include "../src/algorithms/infsumenergy.edp"
+
+// Build Mesh
+mesh Th = buildMesh(Lx, Ly, floor(1./H));
+fespace Vh(Th, P1); 
+Vh ueps;
+
+// Loadings
+real[int, int] loadings = coscosLoading(Th, nbSecondMember);
+
+// Solutions
+Vh[int] SolEps(nbSecondMember);
+real[int] uepsval(ueps[].n);
+for (int p = 0; p < nbSecondMember; p++){
+    string filename = "./Solution/caseperiodic/coscosloading/SolutionOscillating_p"+p+"_eps"+eps+"_h"+h+".txt";
+    loadSolution(uepsval, filename);
+    SolEps[p][] = uepsval;
+}
+
+// Energy
+real[int] energyOscillating(nbSecondMember);
+Vh loadingfield;
+for (int p = 0; p < nbSecondMember; p++){
+    loadingfield[] = loadings(p,:);
+    ueps = SolEps[p];
+    energyOscillating(p) = int1d(Th, 1)(loadingfield * ueps)
+                         + int1d(Th, 2)(loadingfield * ueps)
+                         + int1d(Th, 3)(loadingfield * ueps)
+                         + int1d(Th, 4)(loadingfield * ueps);
+}
+
+
+real[int] Aeff = infSumEnergy(Ainit,
+                            energyOscillating,
+                            loadings,
+                            1, //1 : linesearch Armijo, 0 : fixed step size
+                            nbSecondMember,
+                            Niter,
+                            rho,
+                            m1,
+                            Th);
+
+cout << "Effective coefficient : " << Aeff << endl;

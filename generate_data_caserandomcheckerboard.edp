@@ -1,0 +1,86 @@
+include "parameters.edp"
+include "mesh.edp"
+include "loading.edp"
+include "solver.edp"
+include "io.edp"
+
+// Build Mesh
+int NH = floor(1./(2*eps));
+int Nh = floor(1./h);
+mesh TH=buildMesh(2*NH, 2*NH, 2*NH);
+mesh THrefined=buildMesh(2*NH, 2*NH, 2*NH*r);
+mesh Th=buildMesh(Lx, Ly, Nh);
+int Nelem = TH.nt;
+
+fespace WH(TH, P0);
+fespace WHrefined(THrefined,P0);
+fespace Wh(Th,P0);
+fespace Vh(Th,P1);
+
+matrix I = interpolate(WHrefined, WH);
+
+// Bilinear form
+real phase1 = 16.;
+real phase2 = 4.;
+
+// Linear form
+real[int, int] loadings = coscosLoading(Th, nbSecondMember);
+
+// Generate data
+int omega = 0;	
+WH Adiagonal;
+WHrefined Adiagonalrefined;
+Vh Adiagonaleps;
+Vh Aantidiagonal = 0.*x;
+matrix A;
+
+for (int bigSeed=0; bigSeed < nbMonteCarlo2; bigSeed++){
+    cout << "bigSeed : " << bigSeed << endl;
+    Vh[int] uepsbigSeed(nbSecondMember);
+    Vh ueps;
+
+    for (int m=0; m < nbMonteCarlo; m++) {
+
+        // Coefficient 
+        cout << "Generate one random realization of checkerboar" << endl;
+        randinit(bigSeed*nbMonteCarlo + m);
+        for (int T = 0; T < Nelem-1; T++){
+            omega = sign(randreal2()-0.5);
+            if (fmod(T,2)==0 && omega==1){
+                Adiagonal[][T] = phase1;
+                Adiagonal[][T+1] = phase1;
+            }
+            if (fmod(T,2)==0 && omega==-1){
+                Adiagonal[][T] = phase2;
+                Adiagonal[][T+1] = phase2;
+            }
+        }
+		Adiagonalrefined[] = I*Adiagonal[];
+        Adiagonaleps = Adiagonalrefined(x/eps-NH,y/eps-NH);
+
+        A = stiffnessMatrix(Th, 
+                            Adiagonaleps[], 
+                            Aantidiagonal[], 
+                            Adiagonaleps[]);
+        set(A,solver=sparsesolver);
+
+
+        // Solution
+		cout << "Compute oscillating solutions" << endl;
+
+        for (int p = 0; p<nbSecondMember; p++){
+            real[int] Bp = linearForm(Th, loadings(p,:));
+            real[int] sol = A^-1*Bp; 
+            ueps[] = sol(0:sol.n-2);
+            uepsbigSeed[p][] += ueps[]/nbMonteCarlo;
+        }
+    }
+    // Save 
+    for (int p = 0; p < nbSecondMember; p++){
+        string filename = "./Solution/caserandomcheckerboard/coscosloading/SolutionOscillating_p"+p+"_eps"+eps+"_h"+h+"_bigseed"+bigSeed+"_nbMCMC"+nbMonteCarlo+".txt"
+        saveSolution(uepsbigSeed[p][], filename);
+    }
+}
+				
+
+
