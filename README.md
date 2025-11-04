@@ -8,19 +8,19 @@ This repository provides a framework for building **effective approximations of 
 .  
 ├── src/  
 │ ├── algorithms/ # Core numerical methods for effective coefficient computation  
-│ │ ├── infsumenergy.edp
-│ │ ├── infsumenergyperturbation.edp
-│ ├── io.edp # Input/output routines
-│ ├── loading.edp # Right-hand sides and boundary conditions
-│ ├── mesh.edp # Mesh generation
-│ ├── parameters.edp # Parameter configuration
-│ ├── solver_homdir.edp # Homogeneous Dirichlet problem solver
-│ ├── solver_neumann.edp # Neumann boundary condition solver
-│ 
-├── examples/
-├── generate_data_caseperiodic.edp # Case of a periodic microstructure
-├── generate_data_caserandomcheckerboard.edp # Case of a random checkerboard
-├── run_infsumenergy.edp # Compute effective coefficient using strategy infsupenergy
+│ │ ├── infsumenergy.edp  
+│ │ ├── infsumenergyperturbation.edp  
+│ ├── io.edp # Input/output routines  
+│ ├── loading.edp # Right-hand sides and boundary conditions  
+│ ├── mesh.edp # Mesh generation  
+│ ├── parameters.edp # Parameter configuration  
+│ ├── solver_homdir.edp # Homogeneous Dirichlet problem solver  
+│ ├── solver_neumann.edp # Neumann boundary condition solver  
+│   
+├── examples/  
+├── generate_data_caseperiodic.edp # Case of a periodic microstructure  
+├── generate_data_caserandomcheckerboard.edp # Case of a random checkerboard  
+├── run_infsumenergy.edp # Compute effective coefficient using strategy infsupenergy  
 
 
 ---
