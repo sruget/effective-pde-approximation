@@ -5,9 +5,9 @@ This repository provides a framework for building **effective approximations of 
 ---
 
 ## 📂 Repository Structure
-.
-├── src/
-│ ├── algorithms/ # Core numerical methods for effective coefficient computation
+.  
+├── src/  
+│ ├── algorithms/ # Core numerical methods for effective coefficient computation  
 │ │ ├── infsumenergy.edp
 │ │ ├── infsumenergyperturbation.edp
 │ ├── io.edp # Input/output routines
