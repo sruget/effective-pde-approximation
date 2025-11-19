@@ -4,7 +4,7 @@
 [![FreeFEM++](https://img.shields.io/badge/FreeFEM%2B%2B-v4.13-blue.svg)](https://freefem.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)](https://github.com)
 
-A numerical framework for computing effective coefficients of multiscale partial differential equations (PDEs) using energy minimization methods. Built with FreeFEM++ and optimized for heterogeneous materials and periodic microstructures.
+A numerical framework for computing effective coefficients of multiscale partial differential equations (PDEs) using energy minimization methods. Built with FreeFEM++.
 
 ---
 
@@ -92,9 +92,9 @@ FreeFem++ run_infsumenergy.edp
 **Expected output**:
 ```
 Effective coefficient tensor:
-  A11 = 21.9067
+  A11 = 19.3378
   A12 = -0.00887136
-  A22 = 11.9
+  A22 = 11.8312
 ```
 
 **Computation time**: ~8 seconds on a standard laptop
@@ -186,8 +186,7 @@ A22^ε(x,y) = 12 + 2(sin(2πx/ε) + sin(2πy/ε))
 ```
 
 **Results**:
-- Effective tensor: `A11 ≈ 21.9`, `A22 ≈ 11.9`, `A12 ≈ 0`
-- Close to arithmetic mean (expected for this periodic case)
+- Effective tensor: `A11 ≈ 19.3`, `A22 ≈ 11.8`, `A12 ≈ 0`
 
 See [examples/README.md](examples/README.md) for more examples.
 
