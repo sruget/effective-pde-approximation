@@ -53,8 +53,6 @@ A12^ε(x,y) = 0
 A22^ε(x,y) = 12 + 2(sin(2πx/ε) + sin(2πy/ε))   ∈ [8, 16]
 ```
 
-**Mean values**: `E[A11] = 22`, `E[A22] = 12`
-
 ### Step-by-Step Execution
 
 #### Step 1: Generate Oscillating Solutions
@@ -117,31 +115,13 @@ Number of loadings: 3
 OPTIMIZATION COMPLETE
 ============================================
 Effective coefficient tensor:
-  A11 = 21.9067
+  A11 = 19.33
   A12 = -0.00887136
-  A22 = 11.9
+  A22 = 11.8
 ============================================
-
-Comparison with expected values:
-  A11: computed = 21.9067, expected ≈ 22 (error = 0.0933)
-  A12: computed = -0.00887136, expected ≈ 0.0 (error = 0.00887136)
-  A22: computed = 11.9, expected ≈ 12 (error = 0.1)
 ```
 
 **Computation time**: ~7-8 seconds
-
-### Interpretation of Results
-
-| Component | Computed | Expected (Mean) | Error |
-|-----------|----------|-----------------|-------|
-| A11       | 21.91    | 22.00          | 0.09  |
-| A12       | -0.009   | 0.00           | 0.009 |
-| A22       | 11.90    | 12.00          | 0.10  |
-
-**Analysis**:
-- ✅ **A11 and A22** are very close to the arithmetic mean (expected for periodic case)
-- ✅ **A12 ≈ 0** as expected (no coupling in the original coefficient)
-- ✅ Errors are < 1%, indicating excellent convergence
 
 ---
 
