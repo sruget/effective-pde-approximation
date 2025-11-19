@@ -1,0 +1,6 @@
+# Solution files (generated data)
+Solution/
+examples/Solution/
+
+# Test files
+examples/test_*.edp

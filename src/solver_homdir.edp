@@ -1,0 +1,62 @@
+// ============================================================================================
+// PDE solver for diffusion PDE with homogeneous Dirichlet boundary conditions
+// ============================================================================================
+
+func matrix stiffnessMatrix(mesh &Th, 
+                            real[int] A11, 
+                            real[int] A12, 
+                            real[int] A22)
+{
+    fespace Vh(Th, P1);
+
+    // PDE coefficients
+	Vh A11field, A12field, A22field;
+    A11field[] = A11;
+    A12field[] = A12;
+    A22field[] = A22;
+
+    // Variational form
+    Vh u, v;
+    varf va(u,v) = int2d(Th)(dx(u)*(A11field*dx(v) + A12field*dy(v)) 
+	    	              + dy(u)*(A12field*dx(v) + A22field*dy(v)))
+                 + on(1,2,3,4, u=0);
+
+    matrix A = va(Vh,Vh);
+    return A;
+}
+
+
+func real[int] linearForm(mesh &Th, 
+                        real[int] field, 
+                        int index) 
+{
+    fespace Vh(Th, P1);
+	int n = Vh.ndof;
+
+    // PDE coefficients
+	Vh u0;
+    u0[] = field;
+
+    // Variational form
+    Vh u, v;
+    real[int] b(n);
+    if (index == 0){ // index = 0 refeers to integrand dx(u0) * dx(v)
+        varf vL(u,v) = -int2d(Th)(dx(u0) * dx(v));
+        b = vL(0,Vh);
+    }
+    if (index == 1){ // index = 1 refeers to integrand dx(u0) * dy(v)
+        varf vL(u,v) = -int2d(Th)(dx(u0) * dy(v));
+        b = vL(0,Vh);
+    }
+    if (index == 2){ // index = 2 refeers to integrand dy(u0) * dy(v)
+        varf vL(u,v) = -int2d(Th)(dy(u0) * dy(v));
+        b = vL(0,Vh);
+    }
+    if (index == 3){ // index = 3 refeers to integrand u0 * v
+        varf vL(u,v) = int2d(Th)(u0 * v);
+        b = vL(0,Vh);
+    }
+    
+    return b;
+
+}

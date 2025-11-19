@@ -1,0 +1,255 @@
+//include "../loading.edp"
+//include "../solver_neumann.edp"
+
+// ============================================================================
+// LINE SEARCH WITH ARMIJO CONDITION
+// ============================================================================
+// This function performs a backtracking line search with Armijo condition
+// to find an appropriate step size for the gradient descent algorithm.
+//
+// Parameters:
+//   loadings          - Matrix of loading vectors (right-hand sides)
+//   nbSecondMember    - Number of different loadings
+//   AbarL             - Current effective coefficient tensor [A11, A12, A22]
+//   dir               - Descent direction (gradient)
+//   costfunc          - Current value of the cost function
+//   energyOscillating - Array of energies for oscillating solutions
+//   bound             - Armijo bound (m1 * gradient norm squared * scale)
+//   TH                - Computational mesh
+//   rescalefactor     - Scaling factor for conditioning (typically 10^5)
+//
+// Returns:
+//   Updated effective coefficient tensor satisfying Armijo condition
+// ============================================================================
+func real[int] lineSearchArmijo(
+            real[int, int] loadings,
+			int nbSecondMember,
+            real[int] AbarL,
+            real[int] dir,
+            real costfunc,
+            real[int] energyOscillating,
+            real bound,
+            mesh &TH,
+            real rescalefactor)
+{
+	// Define P1 finite element space
+	fespace VH(TH, P1);
+	int n = VH.ndof;
+	VH urho;
+
+	// Line search initialization
+	int NLineSearch = 0;
+	real rho=1.;  // Step size (will be halved if Armijo condition fails)
+	real[int] Arho(3);
+	real J, linesearch;
+    real[int] one(n);
+    one = 1.;  // Vector of ones for broadcasting scalar to vector
+	real[int] A11(n), A12(n), A22(n);
+
+	// Backtracking loop (maximum 7 iterations)
+	while (NLineSearch < 7){
+		// Compute candidate coefficient: A_new = A_current - rho * gradient
+		Arho = AbarL(:) - rho*dir;
+
+		// Evaluate cost function at candidate point
+		real costfuncrho = 0.;
+		// Broadcast tensor components to vectors
+		A11 = Arho(0)*one;
+		A12 = Arho(1)*one;
+		A22 = Arho(2)*one;
+
+		// Assemble stiffness matrix with candidate coefficient
+		matrix Aarho = stiffnessMatrix(TH,
+									A11,
+									A12,
+									A22);
+		set(Aarho,solver=sparsesolver);
+
+		// Loop over all loadings
+		for (int p = 0; p < nbSecondMember; p++){
+            // Assemble right-hand side
+            real[int] Bp = linearForm(TH, loadings(p,:));
+            // Solve macroscopic problem: Aarho * urho = Bp
+            real[int] sol = Aarho^-1*Bp;
+			urho[] = sol(0:sol.n-2);
+
+			// Compute energy gap: J = E_oscillating - E_macro
+			J = energyOscillating(p) - int2d(TH)(dx(urho) * (Arho[0]*dx(urho) + Arho[1]*dy(urho))
+                                               + dy(urho) * (Arho[1]*dx(urho) + Arho[2]*dy(urho)));
+			// Accumulate cost function: sum of squared energy gaps
+			costfuncrho += rescalefactor*J*J;
+		}
+
+		// Compute directional derivative approximation
+		linesearch = (costfuncrho-costfunc)/rho;
+
+		// Check Armijo condition: sufficient decrease
+		if(linesearch <= bound){return Arho;}
+		// If not satisfied, reduce step size by half
+		else {rho /= 2.;}
+
+		NLineSearch += 1;
+	}
+
+	// Return last candidate if max iterations reached
+	return Arho;
+}
+
+
+
+
+// ============================================================================
+// INFSUMENERGY: EFFECTIVE COEFFICIENT COMPUTATION VIA ENERGY MINIMIZATION
+// ============================================================================
+// Main algorithm to compute the effective (homogenized) coefficient tensor
+// by minimizing the sum of squared energy gaps between oscillating and
+// macroscopic solutions.
+//
+// Mathematical formulation:
+//   Minimize J(A) = sum_p (E_osc^p - E_macro^p(A))^2
+//   where A = [A11, A12, A22] is the effective coefficient tensor
+//
+// Method: Gradient descent with optional Armijo line search
+//
+// Parameters:
+//   Ainit             - Initial guess for effective tensor [A11, A12, A22]
+//   energyOscillating - Array of energies for oscillating solutions
+//   loadings          - Matrix of loading vectors
+//   linesearch        - Flag: 1 = Armijo line search, 0 = fixed step size
+//   nbSecondMember    - Number of different loadings
+//   Niter             - Maximum number of iterations
+//   rho               - Step size (used if linesearch = 0)
+//   m1                - Armijo parameter (typically 0.1)
+//   TH                - Computational mesh
+//
+// Returns:
+//   Optimized effective coefficient tensor [A11, A12, A22]
+// ============================================================================
+func real[int] infSumEnergy(
+            real[int] Ainit,
+	        real[int] energyOscillating,
+            real[int, int] loadings,
+            int linesearch,
+            real nbSecondMember,
+            real Niter,
+            real rho,
+			real m1,
+		    mesh &TH)
+{
+	// ========================================================================
+	// INITIALIZATION
+	// ========================================================================
+
+  	// Mesh and finite element space
+	fespace VH(TH,P1);
+	int n = VH.ndof;
+
+    // Loadings (right-hand sides)
+	VH[int] RHS(nbSecondMember);
+
+
+	// ========================================================================
+	// OPTIMIZATION LOOP
+	// ========================================================================
+
+	// Store coefficient history: listA(iteration, component)
+	real[int, int] listA(Niter, 3);
+	listA(0, :) = Ainit;  // Initialize with initial guess
+
+	// Working arrays
+	real[int] energyMacro(nbSecondMember);  // Macroscopic energies
+    real[int] derJ2(3);	                     // Gradient of cost function
+	VH[int] SolBar(nbSecondMember);         // Macroscopic solutions
+	VH ubar, phi, fH;
+    matrix Abark;                            // Current stiffness matrix
+    real costfunction;                       // Current cost function value
+    real[int] ones(n);
+    ones = 1.;  // Vector of ones for broadcasting
+	real[int] A11(n), A12(n), A22(n);       // Vectorized tensor components
+
+
+	real bound, scale;
+	real rescalefactor = 10^5;  // Scaling factor for numerical conditioning
+
+	// Main iteration loop
+	for (int k = 0; k < Niter-1; k++){
+		// ====================================================================
+		// STEP 1: Solve macroscopic problems with current coefficient
+		// ====================================================================
+
+		// Broadcast current tensor components to vectors
+		A11 = listA(k, 0)*ones;
+		A12 = listA(k, 1)*ones;
+		A22 = listA(k, 2)*ones;
+
+		// Assemble stiffness matrix with current effective coefficient
+        Abark = stiffnessMatrix(TH,
+                            A11,
+                            A12,
+                            A22);
+		set(Abark,solver=sparsesolver);
+
+		// Solve for all loadings
+		for (int p = 0; p < nbSecondMember; p++){
+            // Assemble right-hand side for loading p
+            real[int] Bp = linearForm(TH, loadings(p,:));
+            // Solve: Abark * ubar = Bp
+            real[int] sol = Abark^-1*Bp;
+	        SolBar[p][] = sol(0:sol.n-2);
+            ubar = SolBar[p];
+
+            // Compute macroscopic energy: E_macro = integral(grad(ubar)^T * A * grad(ubar))
+		    energyMacro(p) = int2d(TH)(dx(ubar) * (listA(k, 0)*dx(ubar) + listA(k, 1)*dy(ubar))
+		    	            		 + dy(ubar) * (listA(k, 1)*dx(ubar) + listA(k, 2)*dy(ubar)));
+		}
+
+		// ====================================================================
+		// STEP 2: Compute gradient of cost function
+		// ====================================================================
+
+		// Initialize gradient to zero
+		derJ2 = [0.,0.,0.];
+
+		costfunction = 0.;
+		// Loop over all loadings to compute gradient
+		for (int p = 0; p < nbSecondMember; p++){
+			ubar = SolBar[p];
+
+			// Energy gap for loading p
+			real J = (energyOscillating(p) - energyMacro(p));
+
+			// Accumulate cost function: J_total = sum_p (J^p)^2
+			costfunction += rescalefactor*J*J;
+
+			// Compute gradient components:
+			// dJ/dA11 = 2 * J * integral((du/dx)^2)
+			derJ2[0] += 2 * J * int2d(TH)(dx(ubar) * dx(ubar)) * rescalefactor;
+			// dJ/dA12 = 4 * J * integral((du/dx)(du/dy))  [factor 4 due to symmetry]
+			derJ2[1] += 4 * J * int2d(TH)(dx(ubar) * dy(ubar)) * rescalefactor;
+			// dJ/dA22 = 2 * J * integral((du/dy)^2)
+			derJ2[2] += 2 * J * int2d(TH)(dy(ubar) * dy(ubar)) * rescalefactor;
+		}
+
+		// Normalize gradient by maximum component for better conditioning
+		scale = max(abs(derJ2(0)), abs(derJ2(1)), abs(derJ2(2)));
+		derJ2 /= scale;
+
+		// ====================================================================
+		// STEP 3: Update coefficient tensor
+		// ====================================================================
+
+        if (linesearch == 0){
+        	// Fixed step size: A_{k+1} = A_k - rho * gradient
+		    listA(k+1, :) = listA(k, :) - rho*derJ2;
+        }
+        else{
+        	// Armijo line search for adaptive step size
+        	// Compute Armijo bound: m1 * ||gradient||^2 * scale
+		    bound = m1*(-1)*(derJ2[0]*derJ2[0] + derJ2[1]*derJ2[1] + derJ2[2]*derJ2[2])*scale;
+		    listA(k+1, :) = lineSearchArmijo(loadings, nbSecondMember, listA(k, :), derJ2, costfunction, energyOscillating, bound, TH, rescalefactor);
+        }
+	}
+
+	// Return optimized coefficient tensor from last iteration
+	return listA(Niter-1, :);
+};

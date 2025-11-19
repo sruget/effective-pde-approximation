@@ -1,0 +1,109 @@
+// ============================================================================
+// EXAMPLE: PERIODIC MICROSTRUCTURE - DATA GENERATION
+// ============================================================================
+// This script solves the oscillating PDE problem for a periodic microstructure
+// and saves the solutions. These solutions are later used to compute the
+// effective (homogenized) coefficients.
+//
+// PROBLEM FORMULATION:
+//   -div(A^ε(x) ∇u^ε(x)) = f(x)  in Ω = [0,1]²
+//   u^ε = 0                       on ∂Ω
+//
+// where A^ε(x) is a rapidly oscillating periodic diffusion tensor with
+// period ε = 0.1.
+//
+// PERIODIC COEFFICIENT:
+//   A11^ε(x,y) = 22 + 10(sin(2πx/ε) + sin(2πy/ε))  (diagonal component)
+//   A12^ε(x,y) = 0                                   (off-diagonal component)
+//   A22^ε(x,y) = 12 + 2(sin(2πx/ε) + sin(2πy/ε))   (diagonal component)
+//
+// The coefficient oscillates between:
+//   A11 ∈ [2, 42],  A22 ∈ [8, 16]  (mean: A11≈22, A22≈12)
+//
+// MULTIPLE LOADINGS:
+//   We solve for nbSecondMember = 3 different loadings to improve
+//   the robustness of the effective coefficient computation.
+//
+// OUTPUT:
+//   Solutions are saved in ./Solution/caseperiodic/coscosloading/
+//   File format: SolutionOscillating_p{i}_eps{ε}_h{h}.txt
+//   where i = 0,1,2 is the loading index
+//
+// USAGE:
+//   FreeFem++ generate_data_caseperiodic.edp
+//
+// NEXT STEP:
+//   After running this script, use run_infsumenergy.edp to compute
+//   the effective coefficients from the generated solutions.
+// ============================================================================
+
+// Include required modules
+include "../src/parameters.edp"
+include "../src/mesh.edp"
+include "../src/loading.edp"
+include "../src/solver.edp"
+include "../src/io.edp"
+
+// ============================================================================
+// MESH GENERATION
+// ============================================================================
+// Generate coarse mesh for the macroscopic domain
+// Number of points per side: floor(1/H) = floor(1/0.05) = 20
+mesh Th = buildMesh(Lx, Ly, floor(1./H));
+fespace Vh(Th, P1);
+Vh ueps;
+
+// ============================================================================
+// OSCILLATING DIFFUSION COEFFICIENT
+// ============================================================================
+// Define the periodic coefficient A^ε(x,y)
+// The coefficient varies sinusoidally with period ε in both directions
+
+func Aeps11func = 22 + 10*(sin(2*pi*x/eps) + sin(2*pi*y/eps));
+func Aeps12func = 0.*x;  // Off-diagonal component (zero for this example)
+func Aeps22func = 12 + 2*(sin(2*pi*x/eps) + sin(2*pi*y/eps));
+
+// Interpolate coefficient functions onto finite element space
+Vh A11 = Aeps11func(x,y);
+Vh A12 = Aeps12func(x,y);
+Vh A22 = Aeps22func(x,y);
+
+// ============================================================================
+// ASSEMBLE STIFFNESS MATRIX
+// ============================================================================
+// Build the stiffness matrix for: -div(A^ε ∇u) with Dirichlet BC
+matrix A = stiffnessMatrix(Th, A11[], A12[], A22[]);
+set(A,solver=sparsesolver);  // Use sparse direct solver (UMFPACK)
+
+// ============================================================================
+// GENERATE LOADING FUNCTIONS
+// ============================================================================
+// Create nbSecondMember = 3 orthonormal cosine-based loadings
+// These provide different "views" of the oscillating behavior
+real[int, int] loadings = coscosLoading(Th, nbSecondMember);
+
+// ============================================================================
+// SOLVE AND SAVE SOLUTIONS
+// ============================================================================
+// For each loading, solve the PDE and save the solution
+cout << "Solving oscillating PDE for " << nbSecondMember << " loadings..." << endl;
+
+for (int p = 0; p<nbSecondMember; p++){
+    cout << "  Loading " << (p+1) << "/" << nbSecondMember << "..." << flush;
+
+    // Assemble right-hand side for loading p
+    real[int] Bp = linearForm(Th, loadings(p,:));
+
+    // Solve: A * u^ε = Bp
+    real[int] sol = A^-1*Bp;
+	ueps[] = sol(0:sol.n-1);
+
+    // Save solution to file
+    string filename = "./Solution/caseperiodic/coscosloading/SolutionOscillating_p"+p+"_eps"+eps+"_h"+h+".txt";
+    saveSolution(ueps[], filename);
+
+    cout << " saved to " << filename << endl;
+}
+
+cout << "Data generation complete!" << endl;
+cout << "Next step: run 'FreeFem++ run_infsumenergy.edp' to compute effective coefficients" << endl;

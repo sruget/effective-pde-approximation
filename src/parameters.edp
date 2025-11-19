@@ -1,0 +1,90 @@
+// ============================================================================
+// GLOBAL PARAMETERS
+// ============================================================================
+// This file contains all configuration parameters for the multiscale PDE
+// homogenization framework. Parameters are organized into three categories:
+//   1. Mesh and domain parameters
+//   2. Data generation parameters (loadings, Monte Carlo)
+//   3. Optimization algorithm parameters
+//
+// These parameters are shared across all scripts and examples in the project.
+// ============================================================================
+
+// ============================================================================
+// MESH AND DOMAIN PARAMETERS
+// ============================================================================
+// Parameters controlling the mesh resolution and domain geometry.
+//
+// The multiscale problem involves two length scales:
+//   - Microscale (ε): characteristic size of the heterogeneities
+//   - Fine mesh (h): discretization step for capturing oscillations (h << ε)
+//   - Coarse mesh (H): discretization step for the macroscopic problem (H ~ 1)
+// ============================================================================
+
+real eps = 0.1;                 // Microscale parameter (ε)
+                                // Controls the wavelength of coefficient oscillations
+                                // Smaller values = more rapid oscillations
+
+real r = 27.;                   // Resolution ratio: r = ε/h
+                                // Ensures fine mesh resolves oscillations
+                                // Rule of thumb: r ≥ 20 for accurate results
+
+real h = eps/r;                 // Fine mesh parameter (h ≈ 0.0037)
+                                // Discretization step for oscillating problem
+                                // Automatically computed from eps and r
+
+real H = 0.05;                  // Coarse mesh parameter (H)
+                                // Discretization step for homogenized problem
+                                // Typically H ~ O(1), much larger than h
+
+real Lx = 1.;                   // Domain length in x-direction
+real Ly = 1.;                   // Domain length in y-direction
+                                // Computational domain: Ω = [0, Lx] × [0, Ly]
+
+
+// ============================================================================
+// DATA GENERATION PARAMETERS
+// ============================================================================
+// Parameters for generating test data and computing statistical estimates.
+// ============================================================================
+
+int nbSecondMember = 3;         // Number of loading functions
+                                // Using multiple loadings improves robustness
+                                // of the effective coefficient computation
+                                // Typical range: 3-10
+
+int nbMonteCarlo = 40;          // Number of Monte Carlo samples
+                                // Used for estimating expected values in
+                                // stochastic homogenization problems
+                                // (e.g., random checkerboard case)
+
+int nbMonteCarlo2 = 40;         // Number of samples for confidence intervals
+                                // Used to estimate statistical uncertainty
+                                // in Monte Carlo simulations (95% confidence)
+
+
+// ============================================================================
+// OPTIMIZATION ALGORITHM PARAMETERS
+// ============================================================================
+// Parameters controlling the gradient descent algorithm for computing
+// effective coefficients via energy minimization.
+// ============================================================================
+
+int Niter = 400;                // Maximum number of gradient descent iterations
+                                // More iterations = better convergence (slower)
+                                // Typical range: 100-1000
+
+real rho = 0.1;                 // Fixed step size for gradient descent
+                                // Used when line search is disabled
+                                // Smaller values = more stable, slower convergence
+                                // Typical range: 0.01-0.5
+
+real[int] Ainit = [16., 0., 4.]; // Initial guess for effective tensor [A11, A12, A22]
+                                 // Should be close to expected homogenized values
+                                 // For periodic case with A11~22, A22~12:
+                                 //   A11_init ≈ 16, A12_init ≈ 0, A22_init ≈ 4
+
+real m1 = 0.1;                  // Armijo line search parameter (0 < m1 < 1)
+                                // Controls sufficient decrease condition
+                                // Smaller values = more aggressive line search
+                                // Standard value: 0.1 (10% decrease required)

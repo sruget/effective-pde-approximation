@@ -1,0 +1,68 @@
+// ============================================================================
+// INPUT/OUTPUT UTILITIES
+// ============================================================================
+// This module provides file I/O functions for saving and loading solution
+// vectors. Solutions are stored in text format for easy inspection and
+// portability across different systems.
+// ============================================================================
+
+// ============================================================================
+// SAVE SOLUTION TO FILE
+// ============================================================================
+// Saves a solution vector to a text file. The file format is FreeFEM++'s
+// native array format, which includes the array size followed by the values.
+//
+// Parameters:
+//   u        - Solution vector to save
+//   filename - Output file path (absolute or relative)
+//
+// Returns:
+//   0 on success
+//
+// Example:
+//   Vh u;  // Some finite element function
+//   saveSolution(u[], "./output/solution.txt");
+//
+// File format:
+//   Line 1: Array size (integer)
+//   Following lines: Array values (5 values per line by default)
+// ============================================================================
+func int saveSolution(real[int] u, string filename)
+{
+    ofstream fout(filename);
+    fout << u;
+    fout.flush;
+    return 0;
+}
+
+
+// ============================================================================
+// LOAD SOLUTION FROM FILE
+// ============================================================================
+// Loads a solution vector from a text file. The vector must be pre-allocated
+// with the correct size before calling this function.
+//
+// Parameters:
+//   u        - Reference to solution vector (will be filled with data)
+//   filename - Input file path (absolute or relative)
+//
+// Returns:
+//   0 on success
+//
+// Example:
+//   fespace Vh(Th, P1);
+//   Vh u;
+//   real[int] uval(u[].n);      // Pre-allocate with correct size
+//   loadSolution(uval, "./input/solution.txt");
+//   u[] = uval;                  // Assign to finite element function
+//
+// Note:
+//   The file must have been created with saveSolution() or match its format.
+//   If the file size doesn't match the vector size, behavior is undefined.
+// ============================================================================
+func int loadSolution(real[int] &u, string filename)
+{
+    ifstream fin(filename);
+    fin >> u;
+    return 0;
+}

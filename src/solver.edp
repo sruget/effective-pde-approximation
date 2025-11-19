@@ -1,0 +1,76 @@
+// ============================================================================================
+// PDE solver for diffusion PDE with homogeneous Dirichlet boundary conditions
+// ============================================================================================
+
+// ============================================================================
+// STIFFNESS MATRIX ASSEMBLY
+// ============================================================================
+// Assembles the stiffness matrix for the diffusion operator:
+//   -div(A * grad(u)) = f
+// with homogeneous Dirichlet boundary conditions on all boundaries (labels 1-4)
+//
+// Parameters:
+//   Th   - Computational mesh
+//   A11  - Tensor component A_11 (vector of size ndof)
+//   A12  - Tensor component A_12 (vector of size ndof)
+//   A22  - Tensor component A_22 (vector of size ndof)
+//
+// Returns:
+//   Stiffness matrix with Dirichlet boundary conditions imposed
+// ============================================================================
+func matrix stiffnessMatrix(mesh &Th,
+                            real[int] A11,
+                            real[int] A12,
+                            real[int] A22)
+{
+    fespace Vh(Th, P1);
+
+    // PDE coefficients
+	Vh A11field, A12field, A22field;
+    A11field[] = A11;
+    A12field[] = A12;
+    A22field[] = A22;
+
+    // Variational form
+    Vh u, v;
+    varf va(u,v) = int2d(Th, optimize=0)(dx(u)*(A11field*dx(v) + A12field*dy(v))
+	    	              + dy(u)*(A12field*dx(v) + A22field*dy(v)))
+                 + on(1,2,3,4, u=0);
+
+    matrix A = va(Vh,Vh);
+    return A;
+}
+
+
+// ============================================================================
+// LINEAR FORM ASSEMBLY (DOMAIN LOADING)
+// ============================================================================
+// Assembles the right-hand side vector for a loading applied in the domain.
+// The loading field is typically defined by coscosLoading or sinsinLoading.
+//
+// Parameters:
+//   Th    - Computational mesh
+//   field - Loading field values (vector of size ndof)
+//
+// Returns:
+//   Right-hand side vector for the linear system
+// ============================================================================
+func real[int] linearForm(mesh &Th,
+                        real[int] field)
+{
+    fespace Vh(Th, P1);
+	int n = Vh.ndof;
+
+    // PDE coefficients
+	Vh loadingfield;
+    loadingfield[] = field;
+
+    // Variational form: integrate loading in the domain
+    Vh u, v;
+    varf vL(u,v) = int2d(Th)(loadingfield * v)
+                 + on(1,2,3,4, u=0);
+
+    real[int] b = vL(0,Vh);
+
+    return b;
+}

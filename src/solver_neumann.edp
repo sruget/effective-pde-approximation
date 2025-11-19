@@ -1,0 +1,53 @@
+// =====================================================================
+// PDE solver for diffusion PDE with Neumann boundary conditions
+// =====================================================================
+
+func matrix stiffnessMatrix(mesh &Th, 
+                            real[int] A11, 
+                            real[int] A12, 
+                            real[int] A22)
+{
+    fespace Vh(Th, P1);
+
+    // PDE coefficients
+	Vh A11field, A12field, A22field;
+    A11field[] = A11;
+    A12field[] = A12;
+    A22field[] = A22;
+
+    // Variational form
+    Vh u, v;
+    varf va(u,v) = int2d(Th)(dx(u)*(A11field*dx(v) + A12field*dy(v)) 
+	    	              + dy(u)*(A12field*dx(v) + A22field*dy(v)));
+
+    varf vb(u,v) = int2d(Th)(1.*v);  // Mean value constraint
+
+    matrix A = va(Vh,Vh);
+    real[int] B = vb(0,Vh); 
+    matrix Amat = [ [ A ,  B ] ,
+                    [ B', 0 ] ];
+    return Amat;
+}
+
+
+func real[int] linearForm(mesh &Th, real[int] loading)
+{
+    fespace Vh(Th, P1);
+
+    // PDE coefficients
+	Vh loadingfield;
+    loadingfield[] = loading;
+
+    // Variational form
+    Vh u, v;
+
+    varf vL(u,v) = int1d(Th, 1)(loadingfield * v)
+                 + int1d(Th, 2)(loadingfield * v)
+                 + int1d(Th, 3)(loadingfield * v)
+                 + int1d(Th, 4)(loadingfield * v);
+    
+    real[int] b = vL(0,Vh);
+    real[int] bb = [ b, 0. ];
+
+    return bb;
+}

@@ -1,0 +1,148 @@
+// ============================================================================
+// EXAMPLE: COMPUTE EFFECTIVE COEFFICIENTS - INFSUMENERGY ALGORITHM
+// ============================================================================
+// This script computes the effective (homogenized) diffusion tensor for
+// a periodic microstructure using the infSumEnergy optimization algorithm.
+//
+// METHOD:
+//   The effective tensor A^eff is computed by minimizing the energy gap:
+//     J(A) = Σ_p (E_osc^p - E_macro^p(A))²
+//   where:
+//     - E_osc^p   : energy of the oscillating solution u^ε for loading p
+//     - E_macro^p : energy of the macroscopic solution ū for loading p
+//
+// PREREQUISITES:
+//   Before running this script, you must first generate the oscillating
+//   solutions by running: FreeFem++ generate_data_caseperiodic.edp
+//
+// INPUT:
+//   - Oscillating solutions from ./Solution/caseperiodic/coscosloading/
+//   - Initial guess for effective tensor from parameters.edp
+//
+// OUTPUT:
+//   - Effective tensor A^eff = [A11, A12, A22]
+//   - Convergence information (displayed to console)
+//
+// EXPECTED RESULTS (for periodic case):
+//   A11^eff ≈ 21.9  (oscillating coefficient mean ≈ 22)
+//   A12^eff ≈ 0     (oscillating coefficient = 0)
+//   A22^eff ≈ 11.9  (oscillating coefficient mean ≈ 12)
+//
+// USAGE:
+//   FreeFem++ run_infsumenergy.edp
+//
+// ALGORITHM PARAMETERS:
+//   - Number of iterations: Niter = 400 (from parameters.edp)
+//   - Step size: rho = 0.1 (fixed step) or Armijo line search
+//   - Number of loadings: nbSecondMember = 3
+// ============================================================================
+
+// Include required modules
+include "../src/parameters.edp"
+include "../src/mesh.edp"
+include "../src/loading.edp"
+include "../src/solver.edp"
+include "../src/io.edp"
+include "../src/algorithms/infsumenergy.edp"
+
+// ============================================================================
+// MESH GENERATION
+// ============================================================================
+// Generate coarse mesh (same as in data generation)
+mesh Th = buildMesh(Lx, Ly, floor(1./H));
+fespace Vh(Th, P1);
+Vh ueps;
+
+// ============================================================================
+// OSCILLATING DIFFUSION COEFFICIENT
+// ============================================================================
+// Define the same periodic coefficient as in data generation
+// This is needed to compute the oscillating energy
+func Aeps11func = 22 + 10*(sin(2*pi*x/eps) + sin(2*pi*y/eps));
+func Aeps12func = 0.*x;
+func Aeps22func = 12 + 2*(sin(2*pi*x/eps) + sin(2*pi*y/eps));
+
+// Interpolate onto finite element space
+Vh Aeps11 = Aeps11func(x,y);
+Vh Aeps12 = Aeps12func(x,y);
+Vh Aeps22 = Aeps22func(x,y);
+
+// ============================================================================
+// GENERATE LOADINGS (same as in data generation)
+// ============================================================================
+real[int, int] loadings = coscosLoading(Th, nbSecondMember);
+
+// ============================================================================
+// LOAD PRECOMPUTED OSCILLATING SOLUTIONS
+// ============================================================================
+cout << "Loading oscillating solutions..." << endl;
+
+Vh[int] SolEps(nbSecondMember);
+real[int] uepsval(ueps[].n);
+
+for (int p = 0; p < nbSecondMember; p++){
+    string filename = "./Solution/caseperiodic/coscosloading/SolutionOscillating_p"+p+"_eps"+eps+"_h"+h+".txt";
+    cout << "  Loading solution " << (p+1) << ": " << filename << endl;
+    loadSolution(uepsval, filename);
+    SolEps[p][] = uepsval;
+}
+
+// ============================================================================
+// COMPUTE OSCILLATING ENERGIES
+// ============================================================================
+// Compute the elastic energy for each oscillating solution:
+//   E_osc^p = ∫_Ω ∇u^ε · A^ε ∇u^ε dx
+cout << "\nComputing oscillating energies..." << endl;
+
+real[int] energyOscillating(nbSecondMember);
+for (int p = 0; p < nbSecondMember; p++){
+    ueps = SolEps[p];
+    energyOscillating(p) = int2d(Th)(dx(ueps) * (Aeps11*dx(ueps) + Aeps12*dy(ueps))
+                                   + dy(ueps) * (Aeps12*dx(ueps) + Aeps22*dy(ueps)));
+    cout << "  E_osc[" << p << "] = " << energyOscillating(p) << endl;
+}
+
+// ============================================================================
+// RUN OPTIMIZATION ALGORITHM
+// ============================================================================
+cout << "\n============================================" << endl;
+cout << "Starting optimization algorithm" << endl;
+cout << "============================================" << endl;
+cout << "Initial guess: A11 = " << Ainit[0] << ", A12 = " << Ainit[1] << ", A22 = " << Ainit[2] << endl;
+cout << "Number of iterations: " << Niter << endl;
+cout << "Step size: " << rho << " (fixed step)" << endl;
+cout << "Number of loadings: " << nbSecondMember << endl;
+cout << "============================================\n" << endl;
+
+// Run the infSumEnergy algorithm
+// linesearch = 0: fixed step size (rho)
+// linesearch = 1: Armijo line search
+real[int] Aeff = infSumEnergy(Ainit,
+                            energyOscillating,
+                            loadings,
+                            0, //1 : linesearch Armijo, 0 : fixed step size
+                            nbSecondMember,
+                            Niter,
+                            rho,
+                            m1,
+                            Th);
+
+// ============================================================================
+// DISPLAY RESULTS
+// ============================================================================
+cout << "\n============================================" << endl;
+cout << "OPTIMIZATION COMPLETE" << endl;
+cout << "============================================" << endl;
+cout << "Effective coefficient tensor:" << endl;
+cout << "  A11 = " << Aeff[0] << endl;
+cout << "  A12 = " << Aeff[1] << endl;
+cout << "  A22 = " << Aeff[2] << endl;
+cout << "============================================" << endl;
+
+// Compare with expected values
+real expected_A11 = 22.0;  // Mean of oscillating A11
+real expected_A22 = 12.0;  // Mean of oscillating A22
+cout << "\nComparison with expected values:" << endl;
+cout << "  A11: computed = " << Aeff[0] << ", expected ≈ " << expected_A11 << " (error = " << abs(Aeff[0] - expected_A11) << ")" << endl;
+cout << "  A12: computed = " << Aeff[1] << ", expected ≈ 0.0 (error = " << abs(Aeff[1]) << ")" << endl;
+cout << "  A22: computed = " << Aeff[2] << ", expected ≈ " << expected_A22 << " (error = " << abs(Aeff[2] - expected_A22) << ")" << endl;

@@ -1,0 +1,42 @@
+// ============================================================================
+// MESH GENERATION
+// ============================================================================
+// This module provides mesh generation utilities for rectangular domains.
+// The generated meshes are used for finite element simulations of multiscale
+// partial differential equations (PDEs).
+// ============================================================================
+
+// ============================================================================
+// BUILD RECTANGULAR MESH
+// ============================================================================
+// Generates a structured triangular mesh for a rectangular domain [0,Lx]×[0,Ly].
+// The domain boundaries are labeled for applying boundary conditions:
+//   - Label 1: Bottom boundary (y = 0)
+//   - Label 2: Right boundary (x = Lx)
+//   - Label 3: Top boundary (y = Ly)
+//   - Label 4: Left boundary (x = 0)
+//
+// Parameters:
+//   Lx - Domain length in x-direction
+//   Yx - Domain length in y-direction
+//   n  - Number of mesh points per boundary segment
+//
+// Returns:
+//   Triangular mesh covering the rectangular domain
+//
+// Example:
+//   mesh Th = buildMesh(1.0, 1.0, 20);  // Unit square with 20 points per side
+// ============================================================================
+func mesh buildMesh(real Lx, real Ly, int n)
+{
+    // Define domain boundaries with labels
+    border bottom(t=0, Lx) {x=t; y=0; label=1;}     // Bottom: y = 0
+    border right(t=0, Ly) {x=Lx; y=t; label=2;}     // Right:  x = Lx
+    border top(t=Lx ,0) {x=t; y=Ly; label=3;}       // Top:    y = Ly
+    border left(t=Ly, 0) {x=0; y=t; label=4;}       // Left:   x = 0
+
+    // Generate triangular mesh
+    mesh Th = buildmesh(bottom(n) + right(n) + top(n) + left(n));
+
+    return Th;
+}
