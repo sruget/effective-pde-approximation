@@ -1,4 +1,4 @@
-# Multiscale PDE Homogenization Framework
+# Effective Approximation For Multiscale PDEs
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FreeFEM++](https://img.shields.io/badge/FreeFEM%2B%2B-v4.13-blue.svg)](https://freefem.org/)
